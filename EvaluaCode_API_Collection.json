@@ -1,0 +1,822 @@
+{
+  "info": {
+    "name": "EvaluaCode API",
+    "description": "Colección completa de endpoints de la API de EvaluaCode - Sistema de evaluación automática de exámenes de programación",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "evaluacode-api-collection"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health"]
+            }
+          }
+        },
+        {
+          "name": "Ping",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health/ping",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health", "ping"]
+            }
+          }
+        },
+        {
+          "name": "Ready Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health/ready",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health", "ready"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"usuario@ejemplo.com\",\n  \"password\": \"miPassword123\",\n  \"role\": \"estudiante\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const responseJson = pm.response.json();",
+                  "    if (responseJson.success && responseJson.data.tokens) {",
+                  "        pm.environment.set('accessToken', responseJson.data.tokens.accessToken);",
+                  "        pm.environment.set('refreshToken', responseJson.data.tokens.refreshToken);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"profesorjorge@universidad.edu\",\n  \"password\": \"profesor123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "refresh"]
+            }
+          }
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            }
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"passwordActual\",\n  \"newPassword\": \"nuevoPassword123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/change-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "change-password"]
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "logout"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Courses",
+      "item": [
+        {
+          "name": "Get All Courses",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/courses?search=&periodo=&semestre=&isActive=true&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "courses"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Búsqueda por nombre, código o descripción"
+                },
+                {
+                  "key": "periodo",
+                  "value": "",
+                  "description": "Filtrar por período académico"
+                },
+                {
+                  "key": "semestre",
+                  "value": "",
+                  "description": "Filtrar por semestre"
+                },
+                {
+                  "key": "isActive",
+                  "value": "true",
+                  "description": "Filtrar por estado activo/inactivo"
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Página actual"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Elementos por página"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Course by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/courses/:courseId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "courses", ":courseId"],
+              "variable": [
+                {
+                  "key": "courseId",
+                  "value": "course_id_here"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Course",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Programación Avanzada\",\n  \"codigo\": \"PROG301\",\n  \"descripcion\": \"Curso de programación orientada a objetos y estructuras de datos\",\n  \"docenteId\": \"docente_id_here\",\n  \"periodo\": \"2024-1\",\n  \"semestre\": 3,\n  \"creditos\": 4,\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/courses",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "courses"]
+            }
+          }
+        },
+        {
+          "name": "Update Course",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Programación Avanzada Actualizada\",\n  \"descripcion\": \"Descripción actualizada del curso\",\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/courses/:courseId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "courses", ":courseId"],
+              "variable": [
+                {
+                  "key": "courseId",
+                  "value": "course_id_here"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Course",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/courses/:courseId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "courses", ":courseId"],
+              "variable": [
+                {
+                  "key": "courseId",
+                  "value": "course_id_here"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Assign Teacher to Course",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"docenteId\": \"teacher_id_here\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/courses/:courseId/assign-docente",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "courses", ":courseId", "assign-docente"],
+              "variable": [
+                {
+                  "key": "courseId",
+                  "value": "course_id_here"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Enroll Student in Course",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estudianteId\": \"student_id_here\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/courses/:courseId/enroll",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "courses", ":courseId", "enroll"],
+              "variable": [
+                {
+                  "key": "courseId",
+                  "value": "course_id_here"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Exams",
+      "item": [
+        {
+          "name": "Get All Exams",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/exams?search=&courseId=&tipo=&isActive=true&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "exams"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Búsqueda por título o descripción"
+                },
+                {
+                  "key": "courseId",
+                  "value": "",
+                  "description": "Filtrar por curso"
+                },
+                {
+                  "key": "tipo",
+                  "value": "",
+                  "description": "Filtrar por tipo (teorico, practico, mixto)"
+                },
+                {
+                  "key": "isActive",
+                  "value": "true",
+                  "description": "Filtrar por estado activo/inactivo"
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Página actual"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Elementos por página"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Exam by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/exams/:examId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "exams", ":examId"],
+              "variable": [
+                {
+                  "key": "examId",
+                  "value": "exam_id_here"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Exam",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"courseId\": \"course_id_here\",\n  \"titulo\": \"Examen Final Programación\",\n  \"descripcion\": \"Examen final del curso de programación avanzada\",\n  \"tipo\": \"mixto\",\n  \"fechaApertura\": \"2024-12-15T09:00:00.000Z\",\n  \"fechaCierre\": \"2024-12-15T12:00:00.000Z\",\n  \"duracionMinutos\": 180,\n  \"puntuacionMaxima\": 100,\n  \"intentosPermitidos\": 1,\n  \"isActive\": true,\n  \"configuracion\": {\n    \"shuffleQuestions\": true,\n    \"showResults\": false,\n    \"requireProctoring\": true,\n    \"allowLateSubmission\": false\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/exams",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "exams"]
+            }
+          }
+        },
+        {
+          "name": "Update Exam",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Examen Final Actualizado\",\n  \"descripcion\": \"Descripción actualizada del examen\",\n  \"duracionMinutos\": 120,\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/exams/:examId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "exams", ":examId"],
+              "variable": [
+                {
+                  "key": "examId",
+                  "value": "exam_id_here"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Exam",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/exams/:examId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "exams", ":examId"],
+              "variable": [
+                {
+                  "key": "examId",
+                  "value": "exam_id_here"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Submit Exam (Student)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"answers\": [\n    {\n      \"questionId\": \"question_id_1\",\n      \"response\": \"function factorial(n) { if (n <= 1) return 1; return n * factorial(n-1); }\",\n      \"timeSpent\": 600\n    },\n    {\n      \"questionId\": \"question_id_2\",\n      \"response\": \"La complejidad temporal es O(n) y espacial O(n) por la recursión\",\n      \"timeSpent\": 300\n    }\n  ],\n  \"totalTimeSpent\": 900\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/exams/:examId/submit",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "exams", ":examId", "submit"],
+              "variable": [
+                {
+                  "key": "examId",
+                  "value": "exam_id_here"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Grade Submission (Teacher)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"questionGrades\": [\n    {\n      \"questionId\": \"question_id_1\",\n      \"score\": 8.5,\n      \"feedback\": \"Implementación correcta pero falta documentación\"\n    },\n    {\n      \"questionId\": \"question_id_2\",\n      \"score\": 9.0,\n      \"feedback\": \"Análisis de complejidad excelente\"\n    }\n  ],\n  \"bonus\": 0.5,\n  \"generalFeedback\": \"Buen trabajo en general, mejorar la documentación del código\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/exams/:examId/grade?submissionId=submission_id_here",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "exams", ":examId", "grade"],
+              "query": [
+                {
+                  "key": "submissionId",
+                  "value": "submission_id_here"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "examId",
+                  "value": "exam_id_here"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "File Upload",
+      "item": [
+        {
+          "name": "Upload Single File",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "",
+                  "description": "Archivo a subir (imagen, PDF, documento)"
+                },
+                {
+                  "key": "examId",
+                  "value": "",
+                  "description": "ID del examen (opcional)",
+                  "type": "text"
+                },
+                {
+                  "key": "questionId",
+                  "value": "",
+                  "description": "ID de la pregunta (opcional)",
+                  "type": "text"
+                },
+                {
+                  "key": "fileType",
+                  "value": "document",
+                  "description": "Tipo de archivo: image, document, exam_scan",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/upload/single",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "upload", "single"]
+            }
+          }
+        },
+        {
+          "name": "Upload Multiple Files",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": "",
+                  "description": "Múltiples archivos (máximo 5)"
+                },
+                {
+                  "key": "examId",
+                  "value": "",
+                  "description": "ID del examen (opcional)",
+                  "type": "text"
+                },
+                {
+                  "key": "fileType",
+                  "value": "exam_scan",
+                  "description": "Tipo de archivo: image, document, exam_scan",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/upload/multiple",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "upload", "multiple"]
+            }
+          }
+        },
+        {
+          "name": "List User Files",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/upload/list?fileType=&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "upload", "list"],
+              "query": [
+                {
+                  "key": "fileType",
+                  "value": "",
+                  "description": "Filtrar por tipo: image, document, exam_scan"
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Página actual"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Elementos por página"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete File",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/upload/:publicId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "upload", ":publicId"],
+              "variable": [
+                {
+                  "key": "publicId",
+                  "value": "cloudinary_public_id_here"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

@@ -1,0 +1,302 @@
+// Schema de base de datos para EvaluaCode
+// Sistema de corrección automática de exámenes con IA
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Role {
+  id    Int    @id @default(autoincrement())
+  name  String @unique
+  users User[]
+
+  @@map("roles")
+}
+
+model User {
+  id                  String    @id @default(cuid())
+  email               String    @unique
+  passwordHash        String    @map("password_hash")
+  salt                String
+  roleId              Int       @map("role_id")
+  isVerified          Boolean   @default(false) @map("is_verified")
+  twoFactorEnabled    Boolean   @default(false) @map("two_factor_enabled")
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime? @map("locked_until")
+  lastLogin           DateTime? @map("last_login")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  role             Role               @relation(fields: [roleId], references: [id])
+  coursesAsDocente Course[]           @relation("CourseDocente")
+  enrollments      CourseEnrollment[] @relation("StudentEnrollments")
+  submissions      Submission[]
+  processingJobs   ProcessingJob[]
+  uploads          UploadedFile[]
+
+  @@map("users")
+}
+
+model Course {
+  id          String   @id @default(cuid())
+  nombre      String
+  descripcion String?
+  codigo      String   @unique
+  docenteId   String   @map("docente_id")
+  periodo     String
+  semestre    Int      @default(1)
+  creditos    Int      @default(3)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  docente     User               @relation("CourseDocente", fields: [docenteId], references: [id])
+  exams       Exam[]
+  enrollments CourseEnrollment[]
+
+  @@map("courses")
+}
+
+model Exam {
+  id                 String    @id @default(cuid())
+  courseId           String    @map("course_id")
+  title              String
+  descripcion        String?
+  uploadPath         String?   @map("upload_path")
+  status             String    @default("draft")
+  type               String    @default("teorico") // teorico, practico, mixto
+  fechaApertura      DateTime? @map("fecha_apertura")
+  fechaCierre        DateTime? @map("fecha_cierre")
+  duracionMinutos    Int?      @map("duracion_minutos")
+  puntuacionMaxima   Float     @default(100) @map("puntuacion_maxima")
+  intentosPermitidos Int       @default(1) @map("intentos_permitidos")
+  isActive           Boolean   @default(true) @map("is_active")
+  configuracion      Json? // Configuraciones adicionales
+  createdById        String    @map("created_by_id")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  course         Course          @relation(fields: [courseId], references: [id])
+  pages          ExamPage[]
+  questions      Question[]
+  submissions    Submission[]
+  processingJobs ProcessingJob[]
+  uploads        UploadedFile[]
+
+  @@map("exams")
+}
+
+model ExamPage {
+  id         String @id @default(cuid())
+  examId     String @map("exam_id")
+  pageNumber Int    @map("page_number")
+  imagePath  String @map("image_path")
+
+  // Relations
+  exam Exam @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  @@unique([examId, pageNumber])
+  @@map("exam_pages")
+}
+
+model Question {
+  id         String @id @default(cuid())
+  examId     String @map("exam_id")
+  pageNumber Int    @map("page_number")
+  bbox       Json? // Coordenadas de la pregunta en la página
+  tipo       String // text, code, diagram
+  puntos     Float
+  orden      Int    @default(0)
+
+  // Relations
+  exam      Exam       @relation(fields: [examId], references: [id], onDelete: Cascade)
+  rubrics   Rubric[]
+  testCases TestCase[]
+  answers   Answer[]
+
+  @@map("questions")
+}
+
+model Rubric {
+  id             String @id @default(cuid())
+  questionId     String @map("question_id")
+  estructuraJson Json   @map("estructura_json") // Criterios de evaluación
+
+  // Relations
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@map("rubrics")
+}
+
+model Submission {
+  id          String   @id @default(cuid())
+  examId      String   @map("exam_id")
+  studentId   String   @map("student_id")
+  submittedAt DateTime @default(now()) @map("submitted_at")
+  finalScore  Float?   @map("final_score")
+  maxScore    Float?   @map("max_score")
+
+  // Relations
+  exam     Exam           @relation(fields: [examId], references: [id])
+  student  User           @relation(fields: [studentId], references: [id])
+  answers  Answer[]
+  uploads  UploadedFile[]
+
+  @@unique([examId, studentId])
+  @@map("submissions")
+}
+
+model UploadedFile {
+  id                 String   @id @default(cuid())
+  originalName       String   @map("original_name")
+  filename           String
+  mimetype           String
+  size               Int
+  cloudinaryPublicId String   @map("cloudinary_public_id")
+  cloudinaryUrl      String   @map("cloudinary_url")
+  folder             String?
+  purpose            String
+  uploadedById       String   @map("uploaded_by_id")
+  examId             String?  @map("exam_id")
+  submissionId       String?  @map("submission_id")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  uploadedBy User       @relation(fields: [uploadedById], references: [id])
+  exam       Exam?      @relation(fields: [examId], references: [id], onDelete: SetNull)
+  submission Submission?@relation(fields: [submissionId], references: [id], onDelete: SetNull)
+
+  @@index([uploadedById])
+  @@index([examId])
+  @@index([submissionId])
+  @@map("uploaded_files")
+}
+
+model Answer {
+  id            String  @id @default(cuid())
+  submissionId  String  @map("submission_id")
+  questionId    String  @map("question_id")
+  rawText       String? @map("raw_text")
+  extractedCode String? @map("extracted_code")
+  ocrConfidence Float?  @map("ocr_confidence")
+
+  // Relations
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  question   Question   @relation(fields: [questionId], references: [id])
+  results    Result[]
+
+  @@map("answers")
+}
+
+model TestCase {
+  id             String @id @default(cuid())
+  questionId     String @map("question_id")
+  input          String
+  expectedOutput String @map("expected_output")
+  timeoutMs      Int    @default(5000) @map("timeout_ms")
+
+  // Relations
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@map("test_cases")
+}
+
+model Result {
+  id          String   @id @default(cuid())
+  answerId    String   @map("answer_id")
+  score       Float
+  maxScore    Float    @map("max_score")
+  detailsJson Json     @map("details_json")
+  evaluator   String // gemini, openai, local, manual
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  answer Answer @relation(fields: [answerId], references: [id], onDelete: Cascade)
+
+  @@map("results")
+}
+
+model ProcessingJob {
+  id               String    @id @default(cuid())
+  examId           String    @map("exam_id")
+  studentId        String    @map("student_id")
+  status           String    @default("queued") // queued, processing, completed, failed
+  priority         Int       @default(0)
+  startedAt        DateTime? @map("started_at")
+  completedAt      DateTime? @map("completed_at")
+  errorMessage     String?   @map("error_message")
+  processingTimeMs Int?      @map("processing_time_ms")
+  assignedWorker   String?   @map("assigned_worker")
+  retryCount       Int       @default(0) @map("retry_count")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  exam    Exam @relation(fields: [examId], references: [id])
+  student User @relation(fields: [studentId], references: [id])
+
+  @@map("processing_jobs")
+}
+
+model AIModel {
+  id                 String   @id @default(cuid())
+  name               String
+  version            String
+  type               String // ocr, code_eval, semantic, diagram
+  modelPath          String?  @map("model_path")
+  configJson         Json?    @map("config_json")
+  performanceMetrics Json?    @map("performance_metrics")
+  isActive           Boolean  @default(false) @map("is_active")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  @@unique([name, version])
+  @@map("ai_models")
+}
+
+model Report {
+  id          String   @id @default(cuid())
+  courseId    String?  @map("course_id")
+  examId      String?  @map("exam_id")
+  studentId   String?  @map("student_id")
+  type        String // course_performance, exam_summary, student_report
+  generatedAt DateTime @default(now()) @map("generated_at")
+  filePath    String   @map("file_path")
+
+  @@map("reports")
+}
+
+model AIUsageLog {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  service     String // gemini, openai, cloudinary
+  operation   String // text_analysis, code_eval, image_transform
+  tokensUsed  Int?     @map("tokens_used")
+  creditsUsed Float?   @map("credits_used")
+  cost        Float?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("ai_usage_logs")
+}
+
+model CourseEnrollment {
+  id         String   @id @default(cuid())
+  courseId   String   @map("course_id")
+  studentId  String   @map("student_id")
+  enrolledAt DateTime @default(now()) @map("enrolled_at")
+  status     String   @default("active") // active, dropped, completed
+  finalGrade Float?   @map("final_grade")
+
+  // Relations
+  course  Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student User   @relation("StudentEnrollments", fields: [studentId], references: [id])
+
+  @@unique([courseId, studentId])
+  @@map("course_enrollments")
+}
