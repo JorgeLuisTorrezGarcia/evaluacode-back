@@ -40,14 +40,23 @@ export class RubricController {
         ];
       }
 
+      const questionFilters: Prisma.QuestionWhereInput = {};
+
       if (examId) {
-        whereClause.question = { examId };
+        questionFilters.examId = examId;
       }
 
       if (isActive !== undefined) {
-        whereClause.question = { 
-          ...whereClause.question,
-          exam: { isActive }
+        questionFilters.exam = {
+          is: {
+            isActive
+          }
+        };
+      }
+
+      if (Object.keys(questionFilters).length > 0) {
+        whereClause.question = {
+          is: questionFilters
         };
       }
 
