@@ -2,6 +2,7 @@
 /* global console, process */
 import express from 'express';
 import cors from 'cors';
+import type { CorsOptions } from 'cors';
 import helmet from 'helmet';
 import { config } from '@/config/env';
 import { errorHandler } from '@/middleware/errorHandler';
@@ -24,10 +25,19 @@ export async function createApp(): Promise<EvaluaCodeApp> {
   app.use(helmet());
   
   // CORS configuration
-  const corsOrigins = config.CORS_ORIGINS.split(',').map(origin => origin.trim());
+  const rawOrigins = config.CORS_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean);
+  const corsOptions: CorsOptions = rawOrigins.includes('*')
+    ? {
+        origin: true,
+        credentials: true
+      }
+    : {
+        origin: rawOrigins.length > 0 ? rawOrigins : undefined,
+        credentials: true
+      };
+
   app.use(cors({
-    origin: corsOrigins,
-    credentials: true,
+    ...corsOptions,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
   }));
