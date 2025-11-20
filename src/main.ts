@@ -26,13 +26,15 @@ export async function createApp(): Promise<EvaluaCodeApp> {
   
   // CORS configuration
   const rawOrigins = config.CORS_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean);
-  const corsOptions: CorsOptions = rawOrigins.includes('*')
+  const allowAllOrigins = rawOrigins.length === 0 || rawOrigins.includes('*');
+
+  const corsOptions: CorsOptions = allowAllOrigins
     ? {
-        origin: true,
+        origin: (_origin, callback) => callback(null, true),
         credentials: true
       }
     : {
-        origin: rawOrigins.length > 0 ? rawOrigins : undefined,
+        origin: rawOrigins,
         credentials: true
       };
 
