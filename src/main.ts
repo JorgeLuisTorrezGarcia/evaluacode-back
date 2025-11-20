@@ -1,4 +1,5 @@
 /* eslint-env node */
+/* global console, process */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -14,7 +15,9 @@ import { uploadRouter } from '@/routes/upload';
 import { rubricRouter } from '@/routes/rubrics';
 import { examQuestionsRouter, questionsRouter } from '@/routes/questions';
 
-async function createApp() {
+type EvaluaCodeApp = ReturnType<typeof express>;
+
+export async function createApp(): Promise<EvaluaCodeApp> {
   const app = express();
 
   // Security middleware
@@ -73,10 +76,12 @@ async function createApp() {
   return app;
 }
 
+export const appPromise: Promise<EvaluaCodeApp> = createApp();
+
 async function startServer() {
   try {
-    const app = await createApp();
-    
+    const app = await appPromise;
+
     app.listen(config.PORT, () => {
       console.log(`
 🚀 EvaluaCode Server Started Successfully!
@@ -95,15 +100,17 @@ async function startServer() {
   }
 }
 
-// Graceful shutdown
-process.on('SIGINT', () => {
-  console.log('\n⏹️  Gracefully shutting down...');
-  process.exit(0);
-});
+if (!process.env.VERCEL) {
+  // Graceful shutdown
+  process.on('SIGINT', () => {
+    console.log('\n⏹️  Gracefully shutting down...');
+    process.exit(0);
+  });
 
-process.on('SIGTERM', () => {
-  console.log('⏹️  SIGTERM received. Shutting down gracefully...');
-  process.exit(0);
-});
+  process.on('SIGTERM', () => {
+    console.log('⏹️  SIGTERM received. Shutting down gracefully...');
+    process.exit(0);
+  });
 
-startServer();
+  startServer();
+}
