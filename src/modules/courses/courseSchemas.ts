@@ -8,7 +8,8 @@ export const createCourseSchema = z.object({
   descripcion: z.string()
     .min(10, 'Description must be at least 10 characters')
     .max(500, 'Description too long')
-    .optional(),
+    .optional()
+    .or(z.literal("")),
   docenteId: z.string()
     .cuid('Invalid docente ID format')
     .optional(),
@@ -37,11 +38,11 @@ export const updateCourseSchema = createCourseSchema.partial();
 export const courseFiltersSchema = z.object({
   search: z.string().optional(),
   periodo: z.string().optional(),
-  semestre: z.number().int().optional(),
-  isActive: z.boolean().optional(),
-  docenteId: z.string().cuid().optional(),
-  page: z.number().int().min(1).default(1),
-  limit: z.number().int().min(1).max(50).default(10)
+  semestre: z.coerce.number().int().optional(),
+  isActive: z.coerce.boolean().optional(),
+  docenteId: z.string().refine(val => !val || z.string().cuid().safeParse(val).success, 'Invalid docente ID format').optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(10)
 });
 
 // Schema para asignar docente
@@ -63,6 +64,13 @@ export const bulkEnrollSchema = z.object({
     .max(100, 'Cannot enroll more than 100 students at once')
 });
 
+// Schema para subir archivos al curso
+export const uploadCourseFileSchema = z.object({
+  category: z.enum(['MATERIAL', 'ASSIGNMENT', 'SUBMISSION', 'RESOURCE']).default('MATERIAL'),
+  description: z.string().max(500).optional(),
+  isPublic: z.coerce.boolean().default(true)
+});
+
 // Tipos derivados de los schemas
 export type CreateCourseRequest = z.infer<typeof createCourseSchema>;
 export type UpdateCourseRequest = z.infer<typeof updateCourseSchema>;
@@ -70,3 +78,4 @@ export type CourseFilters = z.infer<typeof courseFiltersSchema>;
 export type AssignDocenteRequest = z.infer<typeof assignDocenteSchema>;
 export type EnrollStudentRequest = z.infer<typeof enrollStudentSchema>;
 export type BulkEnrollRequest = z.infer<typeof bulkEnrollSchema>;
+export type UploadCourseFileRequest = z.infer<typeof uploadCourseFileSchema>;

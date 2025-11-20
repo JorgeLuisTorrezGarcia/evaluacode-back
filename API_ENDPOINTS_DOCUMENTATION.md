@@ -145,6 +145,35 @@
 }
 ```
 
+### POST /api/auth/forgot-password
+**Descripción**: Solicitar enlace/token para restablecer contraseña. En desarrollo, el token se devuelve en la respuesta.
+**Auth**: ❌ No requerida
+**Body**:
+```json
+{
+  "email": "usuario@ejemplo.com"
+}
+```
+**Notas**:
+- Siempre responde éxito por razones de seguridad.
+- El token generado es válido por 24 horas.
+
+### POST /api/auth/reset-password
+**Descripción**: Restablecer contraseña usando el token de recuperación.
+**Auth**: ❌ No requerida
+**Body**:
+```json
+{
+  "token": "c21DYXZlLWlE...",
+  "newPassword": "NuevoPassword123",
+  "confirmNewPassword": "NuevoPassword123"
+}
+```
+**Validaciones**:
+- El token debe ser válido y no estar expirado.
+- `newPassword` debe cumplir con la política de contraseñas (mínimo 8 caracteres, mayúscula, minúscula y número).
+- `confirmNewPassword` debe coincidir.
+
 ### POST /api/auth/logout
 **Descripción**: Cerrar sesión (invalida refresh token)
 **Auth**: ✅ Bearer token requerido
@@ -240,6 +269,19 @@
   "estudianteId": "student_id_here"
 }
 ```
+
+### DELETE /api/courses/:id/unenroll
+**Descripción**: Desinscribir estudiante de un curso (Admin/Docente asignado)
+**Auth**: ✅ Bearer token requerido (Admin/Docente)
+**Body**:
+```json
+{
+  "estudianteId": "student_id_here"
+}
+```
+**Restricciones**:
+- El estudiante debe estar previamente matriculado en el curso.
+- Solo el docente asignado o un administrador pueden ejecutar la operación.
 
 ---
 
@@ -374,6 +416,131 @@
   "generalFeedback": "Buen trabajo en general, mejorar la documentación del código"
 }
 ```
+
+---
+
+## 🧩 Questions Endpoints
+
+### GET /api/exams/:examId/questions
+**Descripción**: Listar preguntas pertenecientes a un examen, con paginación y filtros (`search`, `tipo`, `page`, `limit`).
+**Auth**: ✅ Bearer token requerido (estudiantes matriculados, docente del curso o admin).
+
+### POST /api/questions
+**Descripción**: Crear una nueva pregunta asociada a un examen.
+**Auth**: ✅ Docente asignado del curso o admin.
+**Body** (ejemplo):
+```json
+{
+  "examId": "exam_id_here",
+  "pageNumber": 1,
+  "tipo": "code",
+  "title": "Implementar factorial",
+  "prompt": "Escribe una función factorial en JavaScript",
+  "puntos": 20,
+  "orden": 0,
+  "config": {
+    "starterCode": "function factorial(n) {\n  // tu código\n}\n",
+    "language": "javascript"
+  }
+}
+```
+
+### GET /api/questions/:id
+**Descripción**: Obtener los detalles completos de una pregunta.
+**Auth**: ✅ Estudiante matriculado, docente asignado o admin.
+
+### PUT /api/questions/:id
+**Descripción**: Actualizar los metadatos de una pregunta (prompt, título, puntaje, configuración, orden).
+**Auth**: ✅ Docente asignado o admin.
+
+### DELETE /api/questions/:id
+**Descripción**: Eliminar una pregunta del examen.
+**Auth**: ✅ Docente asignado o admin.
+
+### POST /api/questions/:id/rubrics
+**Descripción**: Crear una rúbrica asociada a la pregunta indicada.
+**Auth**: ✅ Docente asignado o admin.
+
+### PUT /api/questions/rubrics/:id
+**Descripción**: Actualizar una rúbrica existente asociada a una pregunta.
+**Auth**: ✅ Docente asignado o admin.
+
+---
+
+## 📊 Rubrics Endpoints
+
+### GET /api/rubrics
+**Descripción**: Obtener listado de rúbricas con filtros y paginación.
+**Auth**: ✅ Bearer token requerido (Docente/Admin)
+**Query Parameters**:
+- `search` (string): Filtra por nombre o descripción.
+- `courseId` (string): Filtra por curso asociado.
+- `examId` (string): Filtra por examen asociado.
+- `page` (number, default: 1): Página actual.
+- `limit` (number, default: 10): Número de resultados por página.
+
+### GET /api/rubrics/:id
+**Descripción**: Obtener detalles de una rúbrica específica, incluyendo criterios y mapeos.
+**Auth**: ✅ Bearer token requerido (Docente/Admin)
+**Path Parameters**:
+- `id` (string): ID de la rúbrica (cuid).
+
+### POST /api/rubrics
+**Descripción**: Crear una nueva rúbrica.
+**Auth**: ✅ Bearer token requerido (Docente/Admin)
+**Body**:
+```json
+{
+  "nombre": "Rúbrica Examen Final",
+  "descripcion": "Criterios de evaluación para el examen final",
+  "courseId": "course_id_here",
+  "examId": "exam_id_here",
+  "criterios": [
+    {
+      "titulo": "Calidad del código",
+      "descripcion": "Evaluar buenas prácticas y legibilidad",
+      "puntajeMaximo": 10
+    }
+  ]
+}
+```
+**Notas**:
+- `criterios` es opcional; se pueden agregar luego.
+- Se valida ownership del curso/examen.
+
+### PUT /api/rubrics/:id
+**Descripción**: Actualizar una rúbrica existente.
+**Auth**: ✅ Bearer token requerido (Docente/Admin)
+**Body**: Campos opcionales (`nombre`, `descripcion`, `isActive`, etc.).
+
+### DELETE /api/rubrics/:id
+**Descripción**: Eliminar una rúbrica. Si está asociada a envíos calificados, se bloquea.
+**Auth**: ✅ Bearer token requerido (Docente/Admin)
+
+### POST /api/rubrics/:id/criteria
+**Descripción**: Agregar un criterio a una rúbrica existente.
+**Auth**: ✅ Bearer token requerido (Docente/Admin)
+**Body**:
+```json
+{
+  "titulo": "Cobertura de pruebas",
+  "descripcion": "Calidad y cantidad de tests automatizados",
+  "puntajeMaximo": 5
+}
+```
+
+### POST /api/rubrics/:id/duplicate
+**Descripción**: Duplicar una rúbrica (junto con sus criterios) a otro examen.
+**Auth**: ✅ Bearer token requerido (Docente/Admin)
+**Body**:
+```json
+{
+  "destExamId": "otro_exam_id"
+}
+```
+**Validaciones**:
+- El examen destino debe existir y pertenecer al mismo docente/curso autorizado.
+- No se crean duplicados si ya existe una rúbrica equivalente en el examen destino.
 
 ---
 

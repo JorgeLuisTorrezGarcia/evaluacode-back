@@ -52,14 +52,14 @@ export const updateExamSchema = createExamSchema.partial().omit({ courseId: true
 // Schema para filtros de exámenes
 export const examFiltersSchema = z.object({
   search: z.string().optional(),
-  courseId: z.string().cuid().optional(),
+  courseId: z.string().refine(val => !val || z.string().cuid().safeParse(val).success, 'Invalid course ID format').optional(),
   tipo: z.enum([ExamType.TEORICO, ExamType.PRACTICO, ExamType.MIXTO]).optional(),
-  isActive: z.boolean().optional(),
-  docenteId: z.string().cuid().optional(),
+  isActive: z.coerce.boolean().optional(),
+  docenteId: z.string().refine(val => !val || z.string().cuid().safeParse(val).success, 'Invalid docente ID format').optional(),
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
-  page: z.number().int().min(1).default(1),
-  limit: z.number().int().min(1).max(50).default(10)
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(10)
 });
 
 // Schema para envío de examen (estudiante)
@@ -84,9 +84,18 @@ export const gradeSubmissionSchema = z.object({
   bonus: z.number().min(0).default(0)
 });
 
+// Schema para generación de retroalimentación con IA
+export const generateFeedbackSchema = z.object({
+  questionId: z.string().cuid(),
+  studentAnswer: z.string().optional(),
+  context: z.string().optional(),
+  model: z.string().optional()
+});
+
 // Tipos derivados de los schemas
 export type CreateExamRequest = z.infer<typeof createExamSchema>;
 export type UpdateExamRequest = z.infer<typeof updateExamSchema>;
 export type ExamFilters = z.infer<typeof examFiltersSchema>;
 export type SubmitExamRequest = z.infer<typeof submitExamSchema>;
 export type GradeSubmissionRequest = z.infer<typeof gradeSubmissionSchema>;
+export type GenerateFeedbackRequest = z.infer<typeof generateFeedbackSchema>;

@@ -39,6 +39,7 @@ model User {
   submissions      Submission[]
   processingJobs   ProcessingJob[]
   uploads          UploadedFile[]
+  courseFiles      CourseFile[]       @relation("UploadedFiles")
 
   @@map("users")
 }
@@ -60,6 +61,7 @@ model Course {
   docente     User               @relation("CourseDocente", fields: [docenteId], references: [id])
   exams       Exam[]
   enrollments CourseEnrollment[]
+  files       CourseFile[]
 
   @@map("courses")
 }
@@ -90,6 +92,7 @@ model Exam {
   submissions    Submission[]
   processingJobs ProcessingJob[]
   uploads        UploadedFile[]
+  rubrics        Rubric[]
 
   @@map("exams")
 }
@@ -113,25 +116,35 @@ model Question {
   pageNumber Int    @map("page_number")
   bbox       Json? // Coordenadas de la pregunta en la página
   tipo       String // text, code, diagram
+  title      String @default("")
+  prompt     String @default("")
   puntos     Float
   orden      Int    @default(0)
+  configJson Json?  @map("config_json")
 
   // Relations
   exam      Exam       @relation(fields: [examId], references: [id], onDelete: Cascade)
   rubrics   Rubric[]
-  testCases TestCase[]
   answers   Answer[]
+  testCases TestCase[]
 
   @@map("questions")
 }
 
 model Rubric {
   id             String @id @default(cuid())
+  examId         String? @map("exam_id")
   questionId     String @map("question_id")
+  name           String @default("Default Rubric")
   estructuraJson Json   @map("estructura_json") // Criterios de evaluación
+  isActive       Boolean @default(true) @map("is_active")
+  
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   // Relations
-  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  exam           Exam? @relation(fields: [examId], references: [id], onDelete: Cascade)
+  question       Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
   @@map("rubrics")
 }
@@ -143,12 +156,14 @@ model Submission {
   submittedAt DateTime @default(now()) @map("submitted_at")
   finalScore  Float?   @map("final_score")
   maxScore    Float?   @map("max_score")
+  generalFeedback String? @map("general_feedback")
+  bonusAwarded    Float?  @map("bonus_awarded")
 
   // Relations
   exam     Exam           @relation(fields: [examId], references: [id])
   student  User           @relation(fields: [studentId], references: [id])
-  answers  Answer[]
   uploads  UploadedFile[]
+  answers  Answer[]
 
   @@unique([examId, studentId])
   @@map("submissions")
@@ -187,6 +202,8 @@ model Answer {
   rawText       String? @map("raw_text")
   extractedCode String? @map("extracted_code")
   ocrConfidence Float?  @map("ocr_confidence")
+  manualScore   Float?  @map("manual_score")
+  manualFeedback String? @map("manual_feedback")
 
   // Relations
   submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
@@ -299,4 +316,51 @@ model CourseEnrollment {
 
   @@unique([courseId, studentId])
   @@map("course_enrollments")
+}
+
+
+// File uploads for courses
+model CourseFile {
+  id               String         @id @default(cuid())
+  courseId         String         @map("course_id")
+  uploadedBy       String         @map("uploaded_by")
+  fileName         String         @map("file_name")
+  originalName     String         @map("original_name")
+  fileSize         Int            @map("file_size") // bytes
+  mimeType         String         @map("mime_type")
+  filePath         String         @map("file_path")
+  downloadUrl      String         @map("download_url")
+  
+  // Metadata
+  category         FileCategory   @default(MATERIAL)
+  description      String?
+  isPublic         Boolean        @default(true) @map("is_public") // Visible to students
+  
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  course           Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  uploader         User           @relation("UploadedFiles", fields: [uploadedBy], references: [id])
+
+  @@map("course_files")
+}
+
+// Enums
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  SHORT_ANSWER
+  ESSAY
+  CODE
+  FILE_UPLOAD
+  MATCHING
+  FILL_BLANK
+}
+
+enum FileCategory {
+  MATERIAL      // Course materials
+  ASSIGNMENT    // Assignment files
+  SUBMISSION    // Student submissions
+  RESOURCE      // Additional resources
 }

@@ -1,23 +1,28 @@
-import { Request, Response, NextFunction } from 'express';
+import { NextFunction, Request, Response } from 'express';
 import type { Prisma } from '@prisma/client';
+import type { UploadApiResponse } from 'cloudinary';
 import { CustomError } from '../../middleware/errorHandler';
 import { UserRole } from '../../types';
-import { 
-  createCourseSchema,
-  updateCourseSchema,
-  courseFiltersSchema,
+import { createEnrollmentForCourse } from './courseEnrollmentService';
+import {
   assignDocenteSchema,
+  courseFiltersSchema,
+  createCourseSchema,
   enrollStudentSchema,
+  updateCourseSchema,
+  uploadCourseFileSchema
 } from './courseSchemas';
 import type {
-  CreateCourseRequest,
-  UpdateCourseRequest,
-  CourseFilters,
   AssignDocenteRequest,
-  EnrollStudentRequest
+  CourseFilters,
+  CreateCourseRequest,
+  EnrollStudentRequest,
+  UpdateCourseRequest,
+  UploadCourseFileRequest
 } from './courseSchemas';
-import type { ApiResponse, PaginatedResponse } from '../../types';
+import type { ApiResponse } from '../../types';
 import { prisma } from '../../lib/prisma';
+import { CloudinaryService, cloudinary } from '../upload/cloudinaryService';
 
 const courseDetailInclude = {
   docente: {
@@ -59,6 +64,9 @@ const courseDetailInclude = {
   }
 } satisfies Prisma.CourseInclude;
 
+const getCourseFileModel = () => prisma.courseFile;
+
+
 export class CourseController {
   /**
    * GET /api/courses
@@ -85,10 +93,20 @@ export class CourseController {
       if (isActive !== undefined) whereClause.isActive = isActive;
       if (docenteId) whereClause.docenteId = docenteId;
 
-      // Solo mostrar cursos activos para estudiantes
+      // Filtros por rol
       if (req.user?.role === UserRole.ESTUDIANTE) {
+        // Estudiantes solo ven cursos activos en los que están matriculados
         whereClause.isActive = true;
+        whereClause.enrollments = {
+          some: {
+            studentId: req.user.id
+          }
+        };
+      } else if (req.user?.role === UserRole.DOCENTE) {
+        // Docentes solo ven cursos que tienen asignados
+        whereClause.docenteId = req.user.id;
       }
+      // Admin ve todos los cursos (sin filtros adicionales)
 
       // Buscar courses con include explícito
       const courses = await prisma.course.findMany({
@@ -156,24 +174,133 @@ export class CourseController {
         };
       });
 
-      const response: ApiResponse<PaginatedResponse<typeof coursesWithStats[0]>> = {
+      const totalCourses = await prisma.course.count({ where: whereClause });
+      const totalPages = Math.ceil(totalCourses / limit);
+
+      const response: ApiResponse = {
         success: true,
         message: 'Courses retrieved successfully',
         data: {
-          items: coursesWithStats,
-          pagination: {
-            page,
-            limit,
-            total: courses.length,
-            totalPages: Math.ceil(courses.length / limit),
-            hasNext: page < Math.ceil(courses.length / limit),
-            hasPrev: page > 1
-          }
+          courses: coursesWithStats,
+          totalCourses,
+          totalPages,
+          currentPage: page,
+          hasNext: page < totalPages,
+          hasPrevious: page > 1
         },
         timestamp: new Date().toISOString()
       };
 
       res.status(200).json(response);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/courses/:courseId/files
+   * Subir un archivo asociado a un curso
+   */
+  async uploadCourseFile(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { courseId } = req.params;
+
+      if (!courseId) {
+        throw new CustomError('Course ID is required', 400);
+      }
+
+      if (!req.file) {
+        throw new CustomError('File is required', 400);
+      }
+
+      if (!req.user) {
+        throw new CustomError('Authentication required', 401);
+      }
+
+      const payload = uploadCourseFileSchema.parse(req.body) as UploadCourseFileRequest;
+
+      const course = await prisma.course.findUnique({
+        where: { id: courseId },
+        select: { docenteId: true }
+      });
+
+      if (!course) {
+        throw new CustomError('Course not found', 404);
+      }
+
+      if (req.user.role !== UserRole.ADMIN && (req.user.role !== UserRole.DOCENTE || course.docenteId !== req.user.id)) {
+        throw new CustomError('Not authorized to upload files for this course', 403);
+      }
+
+      const isPdf = req.file.mimetype === 'application/pdf';
+
+      const uploadResult = await CloudinaryService.uploadFile(req.file.buffer, {
+        folder: `evaluacode/courses/${courseId}`,
+        resourceType: isPdf ? 'raw' : 'auto'
+      }) as UploadApiResponse;
+
+      const downloadUrl = cloudinary.url(uploadResult.public_id, {
+        resource_type: isPdf ? 'raw' : uploadResult.resource_type,
+        attachment: true,
+        sign_url: false,
+        secure: true,
+        transformation: [{ flags: 'attachment', fetch_format: isPdf ? 'pdf' : undefined }]
+      });
+
+      const courseFileModel = getCourseFileModel();
+
+      const createdFile = await courseFileModel.create({
+        data: {
+          courseId,
+          uploadedBy: req.user.id,
+          fileName: uploadResult.public_id,
+          originalName: req.file.originalname,
+          fileSize: req.file.size,
+          mimeType: req.file.mimetype,
+          filePath: uploadResult.secure_url,
+          downloadUrl,
+          category: payload.category,
+          description: payload.description ?? null,
+          isPublic: payload.isPublic,
+        },
+        select: {
+          id: true,
+          originalName: true,
+          fileName: true,
+          fileSize: true,
+          mimeType: true,
+          filePath: true,
+          downloadUrl: true,
+          category: true,
+          description: true,
+          isPublic: true,
+          createdAt: true,
+          updatedAt: true,
+          uploader: {
+            select: {
+              id: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      const response: ApiResponse = {
+        success: true,
+        message: 'Archivo subido correctamente',
+        data: {
+          file: createdFile,
+          upload: {
+            publicId: uploadResult.public_id,
+            url: uploadResult.secure_url,
+            bytes: uploadResult.bytes,
+            resourceType: uploadResult.resource_type,
+          },
+        },
+        timestamp: new Date().toISOString(),
+      };
+
+      res.status(201).json(response);
     } catch (error) {
       next(error);
     }
@@ -210,13 +337,50 @@ export class CourseController {
         }
       }
 
+      if (req.user?.role === UserRole.DOCENTE && course.docenteId !== req.user.id) {
+        throw new CustomError('Not authorized to access this course', 403);
+      }
+
+      const courseFileModel = getCourseFileModel();
+
+      const files = await courseFileModel.findMany({
+        where: {
+          courseId,
+          ...(req.user?.role === UserRole.ESTUDIANTE ? { isPublic: true } : {}),
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        select: {
+          id: true,
+          originalName: true,
+          fileName: true,
+          fileSize: true,
+          mimeType: true,
+          filePath: true,
+          downloadUrl: true,
+          category: true,
+          description: true,
+          isPublic: true,
+          createdAt: true,
+          updatedAt: true,
+          uploader: {
+            select: {
+              id: true,
+              email: true,
+            },
+          },
+        },
+      });
+
       const response: ApiResponse = {
         success: true,
         message: 'Course details retrieved successfully',
         data: {
           ...course,
           students: course.enrollments.map((e) => e.student),
-          enrollmentCount: course.enrollments.length
+          enrollmentCount: course.enrollments.length,
+          files,
         },
         timestamp: new Date().toISOString()
       };
@@ -247,9 +411,17 @@ export class CourseController {
         throw new CustomError('Course code already exists for this period', 400);
       }
 
+      // Asignar docenteId automáticamente si no se proporciona
+      const assignedDocenteId = validatedData.docenteId || 
+        (req.user?.role === UserRole.DOCENTE ? req.user.id : null);
+
+      if (!assignedDocenteId) {
+        throw new CustomError('Teacher assignment required - docenteId must be provided or user must be a teacher', 400);
+      }
+
       // Crear datos para Prisma con manejo correcto de optional properties
-      const createData: any = {
-        docenteId: validatedData.docenteId,
+      const createData: Prisma.CourseUncheckedCreateInput = {
+        docenteId: assignedDocenteId,
         nombre: validatedData.nombre,
         periodo: validatedData.periodo,
         codigo: validatedData.codigo,
@@ -257,10 +429,9 @@ export class CourseController {
         semestre: validatedData.semestre,
         isActive: validatedData.isActive
       };
-      
-      // Solo agregar descripcion si está definida
+
       if (validatedData.descripcion !== undefined) {
-        createData.descripcion = validatedData.descripcion;
+        createData.descripcion = validatedData.descripcion ?? null;
       }
 
       // Crear curso
@@ -336,9 +507,9 @@ export class CourseController {
       }
 
       // Preparar datos de actualización
-      const updateData: any = {};
+      const updateData: Prisma.CourseUncheckedUpdateInput = {};
       if (validatedData.nombre !== undefined) updateData.nombre = validatedData.nombre;
-      if (validatedData.descripcion !== undefined) updateData.descripcion = validatedData.descripcion;
+      if (validatedData.descripcion !== undefined) updateData.descripcion = validatedData.descripcion ?? null;
       if (validatedData.docenteId !== undefined) updateData.docenteId = validatedData.docenteId;
       if (validatedData.periodo !== undefined) updateData.periodo = validatedData.periodo;
       if (validatedData.codigo !== undefined) updateData.codigo = validatedData.codigo;
@@ -489,47 +660,9 @@ export class CourseController {
         throw new CustomError('Course ID is required', 400);
       }
 
-      // Verificar que el curso existe y está activo
-      const course = await prisma.course.findUnique({ where: { id: courseId } });
-      if (!course || !course.isActive) {
-        throw new CustomError('Course not found or inactive', 404);
-      }
-
-      // Verificar que el estudiante existe
-      const student = await prisma.user.findUnique({
-        where: { id: estudianteId },
-        include: { role: true }
-      });
-
-      if (!student || student.role.name !== UserRole.ESTUDIANTE) {
-        throw new CustomError('Student not found or invalid role', 400);
-      }
-
-      // Verificar si ya está matriculado
-      const existingEnrollment = await prisma.courseEnrollment.findUnique({
-        where: {
-          courseId_studentId: {
-            courseId: courseId,
-            studentId: estudianteId
-          }
-        }
-      });
-
-      if (existingEnrollment) {
-        throw new CustomError('Student already enrolled in this course', 400);
-      }
-
-      // Crear matrícula
-      const enrollment = await prisma.courseEnrollment.create({
-        data: {
-          courseId: courseId,
-          studentId: estudianteId,
-          enrolledAt: new Date()
-        },
-        include: {
-          course: { select: { nombre: true, codigo: true } },
-          student: { select: { email: true } }
-        }
+      const enrollment = await createEnrollmentForCourse({
+        courseId,
+        studentId: estudianteId
       });
 
       const response: ApiResponse = {

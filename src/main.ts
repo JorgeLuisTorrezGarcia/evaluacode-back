@@ -1,3 +1,4 @@
+/* eslint-env node */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -7,9 +8,11 @@ import { requestLogger } from '@/middleware/requestLogger';
 import { healthRouter } from '@/routes/health';
 import { authRouter } from '@/routes/auth';
 import { coursesRouter } from '@/routes/courses';
+import { adminRouter } from '@/routes/admin';
 import { examsRouter } from '@/routes/exams';
 import { uploadRouter } from '@/routes/upload';
 import { rubricRouter } from '@/routes/rubrics';
+import { examQuestionsRouter, questionsRouter } from '@/routes/questions';
 
 async function createApp() {
   const app = express();
@@ -36,8 +39,11 @@ async function createApp() {
   // Routes
   app.use('/api/health', healthRouter);
   app.use('/api/auth', authRouter);
+  app.use('/api/admin', adminRouter);
   app.use('/api/courses', coursesRouter);
   app.use('/api/exams', examsRouter);
+  app.use('/api/questions', questionsRouter);
+  app.use('/api/exams/:examId/questions', examQuestionsRouter);
   app.use('/api/upload', uploadRouter);
   app.use('/api/rubrics', rubricRouter);
   

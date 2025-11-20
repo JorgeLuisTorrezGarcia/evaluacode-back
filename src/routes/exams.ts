@@ -27,6 +27,17 @@ examsRouter.get('/:id',
 );
 
 /**
+ * @route GET /api/exams/:id/export
+ * @desc Exportar resultados del examen en CSV
+ * @access Private (Admin and Teachers)
+ */
+examsRouter.get('/:id/export',
+  authenticateToken,
+  requireDocente,
+  examController.exportExamResults.bind(examController)
+);
+
+/**
  * @route POST /api/exams
  * @desc Crear nuevo examen
  * @access Private (Admin and Teachers)
@@ -79,4 +90,15 @@ examsRouter.post('/:id/grade',
   authenticateToken,
   requireDocente, // Teachers and admins can grade
   examController.gradeSubmission.bind(examController)
+);
+
+/**
+ * @route POST /api/exams/:id/submissions/:submissionId/ai-feedback
+ * @desc Generar retroalimentación automática con Gemini
+ * @access Private (Admin and Teachers)
+ */
+examsRouter.post('/:id/submissions/:submissionId/ai-feedback',
+  authenticateToken,
+  requireDocente,
+  examController.generateAIReview.bind(examController)
 );

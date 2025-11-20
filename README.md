@@ -47,19 +47,7 @@ pnpm prisma:seed  # Poblar BD con datos iniciales
 pnpm prisma:reset # Reset completo de BD (⚠️ destructivo)
 ```
 
-## 📁 Estructura del Proyecto
-```
-src/
-├── config/          # Configuración y variables de entorno
-├── middleware/      # Middlewares personalizados (auth, errors, logging)
-├── modules/         # Módulos de negocio
-│   ├── auth/        # Autenticación JWT + RSA
-│   ├── courses/     # Gestión de cursos y matrículas
-│   └── exams/       # Gestión de exámenes y calificaciones
-├── routes/          # Definición de endpoints REST
-├── types/           # Tipos TypeScript compartidos
-├── utils/           # Utilidades y helpers
-└── main.ts          # Punto de entrada principal
+
 ```
 
 ## 🔧 Configuración
@@ -99,62 +87,72 @@ openssl rsa -in private.key -pubout -out public.key
 ## 📊 API Endpoints
 
 ### Health Check
-```
-GET /api/health      # Estado completo del sistema
-GET /api/health/ping # Ping simple (load balancers)  
-GET /api/health/ready # Readiness check (Kubernetes)
-```
+| Método | Ruta              | Descripción                              |
+|--------|-------------------|------------------------------------------|
+| GET    | `/api/health`     | Estado completo del sistema              |
+| GET    | `/api/health/ping`| Ping sencillo para balanceadores         |
+| GET    | `/api/health/ready` | Verificación de readiness (Kubernetes) |
 
-### Endpoints de Autenticación (✅ Implementados)
-```
-POST /api/auth/register       # Registrar nuevo usuario
-POST /api/auth/login          # Iniciar sesión
-POST /api/auth/refresh        # Renovar access token
-POST /api/auth/logout         # Cerrar sesión
-GET  /api/auth/me            # Información del usuario actual
-POST /api/auth/change-password # Cambiar contraseña
-```
+### Autenticación y Sesiones
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST | `/api/auth/register` | Registrar nuevo usuario |
+| POST | `/api/auth/login` | Iniciar sesión |
+| POST | `/api/auth/refresh` | Renovar access token con refresh token |
+| POST | `/api/auth/logout` | Cerrar sesión e invalidar refresh token |
+| GET  | `/api/auth/me` | Información del usuario autenticado |
+| POST | `/api/auth/change-password` | Cambiar contraseña actual |
+| POST | `/api/auth/forgot-password` | Solicitar token de recuperación (simulado en consola) |
+| POST | `/api/auth/reset-password` | Restablecer contraseña con token |
 
-### Endpoints de Cursos (✅ Implementados)
-```
-GET  /api/courses             # Listar cursos (filtros, paginación)
-GET  /api/courses/:id         # Detalles de curso específico
-POST /api/courses             # Crear nuevo curso (Admin/Docente)
-PUT  /api/courses/:id         # Actualizar curso (Admin/Docente asignado)
-DELETE /api/courses/:id       # Eliminar curso (Admin, sin exámenes)
-POST /api/courses/:id/assign-docente  # Asignar docente (Admin)
-POST /api/courses/:id/enroll  # Matricular estudiante (Admin/Docente)
-```
+### Gestión de Cursos
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET  | `/api/courses` | Listar cursos con filtros y paginación |
+| GET  | `/api/courses/:id` | Detalles del curso |
+| POST | `/api/courses` | Crear curso (admin/docente) |
+| PUT  | `/api/courses/:id` | Actualizar curso (admin/docente asignado) |
+| DELETE | `/api/courses/:id` | Eliminar curso (admin, sin exámenes asociados) |
+| POST | `/api/courses/:id/assign-docente` | Asignar docente (admin) |
+| POST | `/api/courses/:id/enroll` | Matricular estudiante (admin/docente) |
+| DELETE | `/api/courses/:id/unenroll` | Desmatricular estudiante (admin/docente) |
 
-### Endpoints de Exámenes (✅ Implementados)
-```
-GET  /api/exams               # Listar exámenes (filtros, paginación)
-GET  /api/exams/:id           # Detalles de examen específico
-POST /api/exams               # Crear nuevo examen (Admin/Docente)
-PUT  /api/exams/:id           # Actualizar examen (Admin/Docente asignado)
-DELETE /api/exams/:id         # Eliminar examen (Admin/Docente, sin envíos)
-```
+### Gestión de Exámenes
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET  | `/api/exams` | Listar exámenes con filtros |
+| GET  | `/api/exams/:id` | Detalle de examen |
+| POST | `/api/exams` | Crear examen (admin/docente) |
+| PUT  | `/api/exams/:id` | Actualizar examen (admin/docente asignado) |
+| DELETE | `/api/exams/:id` | Eliminar examen (sin submissions)|
+| POST | `/api/exams/:id/submit` | Enviar respuestas (estudiantes) |
+| POST | `/api/exams/:id/grade` | Calificar manualmente (docentes/admin) |
 
-### Endpoints de Envío y Calificación (✅ Implementados)
-```
-POST /api/exams/:id/submit    # Enviar respuestas de examen (Estudiante)
-POST /api/exams/:id/grade     # Calificar manualmente (Docente)
-```
+### Gestión de Rúbricas
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET  | `/api/rubrics` | Listar rúbricas con filtros |
+| GET  | `/api/rubrics/:id` | Detalle de rúbrica |
+| POST | `/api/rubrics` | Crear rúbrica |
+| PUT  | `/api/rubrics/:id` | Actualizar rúbrica |
+| DELETE | `/api/rubrics/:id` | Eliminar rúbrica |
+| POST | `/api/rubrics/:id/criteria` | Agregar criterio |
+| POST | `/api/rubrics/:id/duplicate` | Duplicar rúbrica a otro examen |
 
-### Endpoints de Upload de Archivos (✅ Implementados)
-```
-POST /api/upload/single       # Subir archivo único (hasta 10MB)
-POST /api/upload/multiple     # Subir múltiples archivos (máx 5)
-GET  /api/upload/list         # Listar archivos del usuario
-DELETE /api/upload/:publicId  # Eliminar archivo (propietario/admin)
-```
+### Upload de Archivos
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST | `/api/upload/single` | Subir archivo único (hasta 10 MB) |
+| POST | `/api/upload/multiple` | Subir hasta 5 archivos |
+| GET  | `/api/upload/list` | Listar archivos del usuario |
+| DELETE | `/api/upload/:publicId` | Eliminar archivo (propietario/admin) |
 
-### Próximos Endpoints (Roadmap)
-```
-POST /ai/process-exam         # Procesar examen con IA (Sistema)
-GET  /api/submissions/:id     # Detalles de envío específico
-GET  /api/analytics/course/:id # Analytics de curso para docentes
-```
+### Roadmap / Próximos Endpoints
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST | `/ai/process-exam` | Procesamiento automático con motor IA (FastAPI) |
+| GET  | `/api/submissions/:id` | Detalle de submission (pendiente) |
+| GET  | `/api/analytics/course/:id` | Analytics avanzadas para docentes |
 
 ## 🔐 Sistema de Autenticación
 

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { courseController } from '../modules/courses/courseController';
 import { authenticateToken, requireAuth, requireAdmin, requireDocente } from '../middleware/authMiddleware';
+import { upload } from '../modules/upload/uploadController';
 
 export const coursesRouter: Router = Router();
 
@@ -46,6 +47,18 @@ coursesRouter.put('/:id',
   authenticateToken,
   requireDocente, // Controller handles specific permissions
   courseController.updateCourse.bind(courseController)
+);
+
+/**
+ * @route POST /api/courses/:courseId/files
+ * @desc Subir archivo asociado a un curso
+ * @access Private (Admin or assigned teacher)
+ */
+coursesRouter.post('/:courseId/files',
+  authenticateToken,
+  requireDocente,
+  upload.single('file'),
+  courseController.uploadCourseFile.bind(courseController)
 );
 
 /**
