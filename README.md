@@ -30,6 +30,16 @@ pnpm prisma:seed
 
 # Modo desarrollo
 pnpm dev
+
+
+
+# Docker
+docker build -t evaluacode-back:1.0 .
+
+docker run -d -p 3000:3000 --env-file .env evaluacode-back:1.0
+
+
+
 ```
 
 ### Scripts Disponibles
