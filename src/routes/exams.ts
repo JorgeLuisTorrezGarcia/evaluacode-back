@@ -102,3 +102,14 @@ examsRouter.post('/:id/submissions/:submissionId/ai-feedback',
   requireDocente,
   examController.generateAIReview.bind(examController)
 );
+
+/**
+ * @route POST /api/exams/:id/submissions/:submissionId/ai-score
+ * @desc Generar calificación automática con Gemini
+ * @access Private (Admin and Teachers)
+ */
+examsRouter.post('/:id/submissions/:submissionId/ai-score',
+  authenticateToken,
+  requireDocente,
+  examController.generateAIScore.bind(examController)
+);

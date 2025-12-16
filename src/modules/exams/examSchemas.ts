@@ -86,8 +86,20 @@ export const gradeSubmissionSchema = z.object({
 
 // Schema para generación de retroalimentación con IA
 export const generateFeedbackSchema = z.object({
-  questionId: z.string().cuid(),
+  questionId: z.string().cuid('Invalid question ID format'),
   studentAnswer: z.string().optional(),
+  context: z.string().optional(),
+  model: z.string().optional()
+});
+
+// Schema para generar calificación con IA
+export const generateAiScoreSchema = z.object({
+  questionId: z.string().cuid('Invalid question ID format'),
+  studentAnswer: z.string().optional(),
+  maxPoints: z.number().min(0.1, 'Max points must be at least 0.1').max(1000, 'Max points cannot exceed 1000'),
+  questionType: z.enum(['text', 'code', 'file_upload', 'multiple_choice']),
+  questionPrompt: z.string().optional(),
+  rubric: z.string().optional(),
   context: z.string().optional(),
   model: z.string().optional()
 });
@@ -99,3 +111,4 @@ export type ExamFilters = z.infer<typeof examFiltersSchema>;
 export type SubmitExamRequest = z.infer<typeof submitExamSchema>;
 export type GradeSubmissionRequest = z.infer<typeof gradeSubmissionSchema>;
 export type GenerateFeedbackRequest = z.infer<typeof generateFeedbackSchema>;
+export type GenerateAiScoreRequest = z.infer<typeof generateAiScoreSchema>;

@@ -26,6 +26,7 @@ pnpm prisma:generate
 pnpm prisma:migrate
 
 # Poblar base de datos con datos iniciales
+pnpm add -D ts-node
 pnpm prisma:seed
 
 # Modo desarrollo
