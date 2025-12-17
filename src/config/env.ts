@@ -1,3 +1,6 @@
+/* eslint-env node */
+/* global console, process */
+
 import { config as loadEnv } from 'dotenv';
 import { z } from 'zod';
 
@@ -16,7 +19,6 @@ const envSchema = z.object({
   
   // AI Services
   GEMINI_API_KEY: z.string().min(1, 'GEMINI_API_KEY is required'),
-  OPENAI_API_KEY: z.string().optional(),
   
   // JWT
   JWT_PRIVATE_KEY: z.string().min(1, 'JWT_PRIVATE_KEY is required'),
@@ -25,12 +27,6 @@ const envSchema = z.object({
   JWT_ACCESS_TOKEN_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_TOKEN_EXPIRES_IN: z.string().default('7d'),
   
-  // Redis
-  REDIS_URL: z.string().default('redis://localhost:6379'),
-  
-  // Judge0 (optional)
-  JUDGE0_API_URL: z.string().optional(),
-  JUDGE0_API_KEY: z.string().optional(),
   
   // AI Engine Service
   AI_ENGINE_URL: z.string().url().default('http://localhost:8000'),

@@ -1164,10 +1164,6 @@ Respuesta del estudiante:`;
         userParts.push({ text: `Contexto adicional proporcionado por el docente:\n${validatedBody.context}` });
       }
 
-      userParts.push({
-        text: 'Entrega retroalimentación puntual, marca si la respuesta está vacía e incluye sugerencias concretas.'
-      });
-
       const content: Content[] = [{
         role: 'user',
         parts: userParts
@@ -1462,7 +1458,7 @@ Respuesta del estudiante:`;
           }],
           promptFeedback: undefined,
           usageMetadata: undefined
-        } as EnhancedGenerateContentResponse;
+        } as unknown as EnhancedGenerateContentResponse;
         
         console.info('[AI][generateAIScore] Respuesta completa de Gemini', {
           examId: req.params.id,
@@ -1533,13 +1529,13 @@ Respuesta del estudiante:`;
 
       // Buscar puntuación entre asteriscos: *7.5*
       const asteriskMatch = text.match(/\*(\d+(?:\.\d+)?)\*/);
-      if (asteriskMatch) {
+      if (asteriskMatch && asteriskMatch[1]) {
         score = parseFloat(asteriskMatch[1]);
         reasoning = (text.replace(/\*\d+(?:\.\d+)?\*/, '').trim()) || '';
       } else {
         // Fallback: buscar cualquier número en el texto
         const numberMatch = text.match(/(\d+(?:\.\d+)?)/);
-        if (numberMatch) {
+        if (numberMatch && numberMatch[1]) {
           score = parseFloat(numberMatch[1]);
           reasoning = (text.replace(/\d+(?:\.\d+)?/, '').trim()) || '';
         } else {
