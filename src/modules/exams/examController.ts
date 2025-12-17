@@ -1054,7 +1054,7 @@ export class ExamController {
     }
   }
 
-  private getGeminiClient() {
+  private getGeminiClient(): GoogleGenerativeAI {
     const apiKey = env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new CustomError('Gemini API key is not configured', 500);
@@ -1156,13 +1156,14 @@ Respuesta del estudiante:`;
       let imageUrl: string | null = null;
       let cleanAnswer = studentAnswer;
       
-      if (studentAnswer.includes(':') && studentAnswer.includes('http')) {
-        const parts = studentAnswer.split(':');
-        if (parts.length >= 2 && parts[parts.length - 1]) {
-          imageUrl = parts[parts.length - 1]!.trim();
-          cleanAnswer = parts.slice(0, -1).join(':').trim();
+      if (studentAnswer.includes(':') && studentAnswer.includes('https://')) {
+        // Buscar la primera ocurrencia de "https://" para extraer la URL completa
+        const httpsIndex = studentAnswer.indexOf('https://');
+        if (httpsIndex > 0) {
+          imageUrl = studentAnswer.substring(httpsIndex).trim();
+          cleanAnswer = studentAnswer.substring(0, httpsIndex - 1).trim();
         }
-      } else if (studentAnswer.startsWith('http')) {
+      } else if (studentAnswer.startsWith('https://')) {
         imageUrl = studentAnswer;
         cleanAnswer = '';
       }
@@ -1230,7 +1231,6 @@ Respuesta del estudiante:`;
         parts: userParts
       }];
 
-
       let aiResponse: EnhancedGenerateContentResponse | null = null;
       try {
         const safetySettings: SafetySetting[] = [
@@ -1296,22 +1296,22 @@ Respuesta del estudiante:`;
         throw new CustomError(`Gemini bloqueó la generación (${blockReason})`, 422);
       }
 
-      const textPieces = (aiResponse.candidates ?? [])
+      const textPieces = (aiResponse?.candidates ?? [])
         .flatMap((candidate) => candidate.content?.parts ?? [])
-        .map((part: Part) => {
+        .map((part) => {
           if ('text' in part && typeof part.text === 'string') {
             return part.text.trim();
           }
-          return null;
+          return '';
         })
-        .filter((piece): piece is string => Boolean(piece));
+        .filter((piece) => Boolean(piece));
 
       const text = textPieces.length > 0 ? textPieces.join('\n').trim() : null;
 
       if (!text) {
-        const finishReasons = (aiResponse.candidates ?? [])
-          .map((candidate: GenerateContentCandidate): string | undefined => candidate.finishReason)
-          .filter((reason): reason is string => Boolean(reason));
+        const finishReasons = (aiResponse?.candidates ?? [])
+          .map((candidate) => candidate.finishReason)
+          .filter((reason) => Boolean(reason));
         console.error('[AI][generateAIReview] Gemini no generó texto', {
           examId,
           submissionId,
@@ -1342,7 +1342,14 @@ Respuesta del estudiante:`;
 
       res.status(200).json(apiResponse);
     } catch (error) {
-      if (error instanceof GoogleGenerativeAIFetchError || error instanceof GoogleGenerativeAIResponseError) {
+      if (error instanceof GoogleGenerativeAIFetchError) {
+        console.error('[AI][generateAIReview] Error de Gemini', {
+          examId: req.params.id,
+          submissionId: req.params.submissionId,
+          error: error.message
+        });
+        throw new CustomError(`Gemini respondió con error: ${error.message}`, 502);
+      } else if (error instanceof Error) {
         console.error('[AI][generateAIReview] Error de Gemini', {
           examId: req.params.id,
           submissionId: req.params.submissionId,
@@ -1440,13 +1447,72 @@ Respuesta del estudiante:`;
       userParts.push({ text: promptText });
 
       const studentAnswer = validatedBody.studentAnswer ?? 'Sin respuesta proporcionada';
-      const isCloudinaryAsset = studentAnswer.startsWith('http');
+      
+      // Extraer URL si está en formato "nombre: url"
+      let imageUrl: string | null = null;
+      let cleanAnswer = studentAnswer;
+      
+      if (studentAnswer.includes(':') && studentAnswer.includes('https://')) {
+        // Buscar la primera ocurrencia de "https://" para extraer la URL completa
+        const httpsIndex = studentAnswer.indexOf('https://');
+        if (httpsIndex > 0) {
+          imageUrl = studentAnswer.substring(httpsIndex).trim();
+          cleanAnswer = studentAnswer.substring(0, httpsIndex - 1).trim();
+        }
+      } else if (studentAnswer.startsWith('https://')) {
+        imageUrl = studentAnswer;
+        cleanAnswer = '';
+      }
+      
+      const isCloudinaryAsset = imageUrl !== null;
 
       if (isCloudinaryAsset) {
+        try {
+          // Descargar la imagen desde Cloudinary
+          const imageResponse = await fetch(imageUrl!);
+          if (!imageResponse.ok) {
+            throw new Error(`Failed to fetch image: ${imageResponse.statusText}`);
+          }
+          
+          const imageBuffer = await imageResponse.arrayBuffer();
+          const imageBase64 = Buffer.from(imageBuffer).toString('base64');
+          
+          // Determinar el MIME type desde la URL o por defecto
+          const mimeType = imageUrl!.includes('.png') ? 'image/png' : 
+                          imageUrl!.includes('.jpg') || imageUrl!.includes('.jpeg') ? 'image/jpeg' : 
+                          'image/png';
+          
+          userParts.push({
+            inlineData: {
+              mimeType: mimeType,
+              data: imageBase64
+            }
+          });
+          
+          console.info('[AI][generateAIScore] Imagen procesada', {
+            imageUrl,
+            mimeType,
+            sizeBytes: imageBuffer.byteLength
+          });
+        } catch (error) {
+          console.error('[AI][generateAIScore] Error procesando imagen', {
+            imageUrl,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+          
+          // Fallback: enviar solo la URL como texto
+          userParts.push({
+            text: `El estudiante envió un recurso visual. URL: ${imageUrl}`
+          });
+        }
+      }
+      
+      // Siempre agregar la respuesta de texto (limpia)
+      if (cleanAnswer) {
         userParts.push({
-          text: `El estudiante envió un recurso visual. URL: ${studentAnswer}`
+          text: `Respuesta del estudiante:\n${cleanAnswer}`
         });
-      } else {
+      } else if (!isCloudinaryAsset) {
         userParts.push({
           text: `Respuesta del estudiante:\n${studentAnswer}`
         });
@@ -1520,26 +1586,25 @@ Respuesta del estudiante:`;
             usageMetadata: aiResponse?.usageMetadata
           }
         });
-      } catch (error) {
+      } catch (error: unknown) {
         if (error instanceof GoogleGenerativeAIFetchError || error instanceof GoogleGenerativeAIResponseError) {
-          const blockReason = (error as GoogleGenerativeAIResponseError<unknown> & { response?: { candidates?: Array<{ finishReason?: string }> } })?.response?.candidates?.[0]?.finishReason;
           console.error('[AI][generateAIScore] Error de Gemini', {
             examId: req.params.id,
             submissionId: req.params.submissionId,
             error: error.message
           });
-          throw new CustomError(`Gemini bloqueó la calificación (${blockReason})`, 422);
+          throw new CustomError(`Gemini respondió con error: ${error.message}`, 502);
         }
         throw error;
       }
 
       const textPieces = (aiResponse?.candidates ?? [])
-        .flatMap((candidate) => candidate.content?.parts ?? [])
+        .flatMap((candidate: GenerateContentCandidate) => candidate.content?.parts ?? [])
         .map((part: Part) => {
           if ('text' in part && typeof part.text === 'string') {
             return part.text.trim();
           }
-          return null;
+          return '';
         })
         .filter((piece): piece is string => Boolean(piece));
 
