@@ -1,5 +1,5 @@
 /* eslint-env node */
-/* global console */
+/* global console, fetch, Buffer */
 import { NextFunction, Request, Response } from 'express';
 import type { Prisma } from '@prisma/client';
 import {
@@ -1135,26 +1135,87 @@ export class ExamController {
 
       const userParts: Part[] = [];
 
-      const promptText = `Eres un evaluador experto. Analiza esta respuesta y asigna un puntaje de 0 a ${validatedBody.maxPoints} puntos.
+      const promptText = `Eres un docente de programacion. Analiza esta respuesta que puede ser texto o archivo adjunto en url y proporciona retroalimentación constructiva y en texto plano(NO MARKDOWN).
 
 CONSIGNA: ${question.title ?? 'Sin título'}
 DESCRIPCIÓN: ${question.prompt ?? 'Sin descripción'}
 
-Envuelve la puntuación final entre asteriscos así: *puntuación*
-Ejemplo: *7.5*
+Proporciona una retroalimentación que incluya:
+1. Fortalezas de la respuesta
+2. Áreas de mejora
+3. Sugerencias específicas
+4. Conceptos clave que faltan o podrían reforzarse
 
 Respuesta del estudiante:`;
 
       userParts.push({ text: promptText });
 
       const studentAnswer = validatedBody.studentAnswer ?? 'Sin respuesta proporcionada';
-      const isCloudinaryAsset = studentAnswer.startsWith('http');
+      
+      // Extraer URL si está en formato "nombre: url"
+      let imageUrl: string | null = null;
+      let cleanAnswer = studentAnswer;
+      
+      if (studentAnswer.includes(':') && studentAnswer.includes('http')) {
+        const parts = studentAnswer.split(':');
+        if (parts.length >= 2 && parts[parts.length - 1]) {
+          imageUrl = parts[parts.length - 1]!.trim();
+          cleanAnswer = parts.slice(0, -1).join(':').trim();
+        }
+      } else if (studentAnswer.startsWith('http')) {
+        imageUrl = studentAnswer;
+        cleanAnswer = '';
+      }
+      
+      const isCloudinaryAsset = imageUrl !== null;
 
       if (isCloudinaryAsset) {
+        try {
+          // Descargar la imagen desde Cloudinary
+          const imageResponse = await fetch(imageUrl!);
+          if (!imageResponse.ok) {
+            throw new Error(`Failed to fetch image: ${imageResponse.statusText}`);
+          }
+          
+          const imageBuffer = await imageResponse.arrayBuffer();
+          const imageBase64 = Buffer.from(imageBuffer).toString('base64');
+          
+          // Determinar el MIME type desde la URL o por defecto
+          const mimeType = imageUrl!.includes('.png') ? 'image/png' : 
+                          imageUrl!.includes('.jpg') || imageUrl!.includes('.jpeg') ? 'image/jpeg' : 
+                          'image/png';
+          
+          userParts.push({
+            inlineData: {
+              mimeType: mimeType,
+              data: imageBase64
+            }
+          });
+          
+          console.info('[AI][generateAIReview] Imagen procesada', {
+            imageUrl,
+            mimeType,
+            sizeBytes: imageBuffer.byteLength
+          });
+        } catch (error) {
+          console.error('[AI][generateAIReview] Error procesando imagen', {
+            imageUrl,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+          
+          // Fallback: enviar solo la URL como texto
+          userParts.push({
+            text: `El estudiante envió un recurso visual. URL: ${imageUrl}`
+          });
+        }
+      }
+      
+      // Siempre agregar la respuesta de texto (limpia)
+      if (cleanAnswer) {
         userParts.push({
-          text: `El estudiante envió un recurso visual. URL: ${studentAnswer}`
+          text: `Respuesta del estudiante:\n${cleanAnswer}`
         });
-      } else {
+      } else if (!isCloudinaryAsset) {
         userParts.push({
           text: `Respuesta del estudiante:\n${studentAnswer}`
         });
@@ -1169,16 +1230,6 @@ Respuesta del estudiante:`;
         parts: userParts
       }];
 
-      console.info('[AI][generateAIReview] Preparando solicitud', {
-        examId,
-        submissionId,
-        questionId: question.id,
-        model,
-        role: req.user.role,
-        partsCount: userParts.length,
-        hasContext: Boolean(validatedBody.context),
-        hasAsset: isCloudinaryAsset
-      });
 
       let aiResponse: EnhancedGenerateContentResponse | null = null;
       try {

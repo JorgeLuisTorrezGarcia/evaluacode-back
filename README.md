@@ -32,6 +32,9 @@ pnpm prisma:seed
 # Modo desarrollo
 pnpm dev
 
+#PRODUCCION en MV azure
+pnpm build
+pm2 start pnpm --name "evaluacode-back" -- run start
 
 
 # Docker

@@ -88,8 +88,6 @@ export const gradeSubmissionSchema = z.object({
 export const generateFeedbackSchema = z.object({
   questionId: z.string().cuid('Invalid question ID format'),
   studentAnswer: z.string().optional(),
-  maxPoints: z.number().min(0.1, 'Max points must be at least 0.1').max(1000, 'Max points cannot exceed 1000'),
-  questionType: z.enum(['text', 'code', 'file_upload', 'multiple_choice']),
   questionPrompt: z.string().optional(),
   rubric: z.string().optional(),
   context: z.string().optional(),
